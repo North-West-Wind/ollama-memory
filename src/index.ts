@@ -4,13 +4,19 @@ import express from "express";
 import * as fs from "fs";
 import moment from "moment";
 import fetch from "node-fetch";
+import { exit } from "process";
 
 const MAX_HISTORY = typeof process.env.MAX_HISTORY == "number" ? process.env.MAX_HISTORY : 1000;
 const SAVE_INTERVAL = typeof process.env.SAVE_INTERVAL == "number" ?  process.env.SAVE_INTERVAL : 60000;
 const OLLAMA = process.env.OLLAMA || "http://127.0.0.1:11434";
 fetch(OLLAMA).then(async res => {
-	if (!res.ok || (await res.text()) != "Ollama is running")
-		throw new Error("Invalid Ollama API URL");
+	if (!res.ok || (await res.text()) != "Ollama is running") {
+		console.error("Invalid Ollama API URL");
+		exit(1);
+	}
+}).catch(err => {
+	console.error(err);
+	exit(1);
 });
 
 if (!fs.existsSync("history") || !fs.statSync("history").isDirectory()) fs.mkdirSync("history");
@@ -53,8 +59,13 @@ const modelHistory: { [key: string]: { role: string, content: string }[] } = {};
 app.post("/chat/:model", async (req, res) => {
 	const body = validateRequestBody(req.body);
 	if (!body) return res.json({ error: "Invalid request" });
-	const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: req.params.model }) });
-	if (!checkModel.ok) return res.json({ error: "Invalid model " + req.params.model });
+	try {
+		const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: req.params.model }) });
+		if (!checkModel.ok) return res.json({ error: "Invalid model " + req.params.model });
+	} catch (err) {
+		console.error(err);
+		return res.json({ error: err });
+	}
 
 	if (!modelHistory[req.params.model]) {
 		if (!fs.existsSync("history/" + req.params.model))
