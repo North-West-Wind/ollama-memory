@@ -72,11 +72,17 @@ app.post("/chat/:model", async (req, res) => {
 	if (body.noResponse) {
 		res.json({ done: true });
 	} else {
-		const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ model: req.params.model, messages: modelHistory[req.params.model], stream: false }) });
-		if (!chat.ok) return res.json({ error: "Server error " + chat.status });
-		const response = (await chat.json()) as { message: Chat };
-		res.json(response);
-		modelHistory[req.params.model].push(response.message);
+		try {
+			const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ model: req.params.model, messages: modelHistory[req.params.model], stream: false }) });
+			if (!chat.ok) res.json({ error: "Ollama error " + chat.status });
+			else {
+				const response = (await chat.json()) as { message: Chat };
+				res.json(response);
+				modelHistory[req.params.model].push(response.message);
+			}
+		} catch (err) {
+			res.json({ error: "Server error " + err });
+		}
 	}
 	if (modelHistory[req.params.model].length > MAX_HISTORY) modelHistory[req.params.model].splice(0, modelHistory[req.params.model].length - MAX_HISTORY);
 });
