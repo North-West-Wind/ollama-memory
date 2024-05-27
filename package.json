@@ -1,7 +1,7 @@
 {
   "name": "ollama-memory",
   "version": "1.0.0",
-  "description": "An Ollama API wrapper to make the model remember chat history.",
+  "description": "An Ollama API wrapper to make a model remember previous chat.",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
@@ -23,5 +23,19 @@
     "express": "^4.19.2",
     "moment": "^2.30.1",
     "node-fetch": "^2.7.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/North-West-Wind/ollama-memory.git"
+  },
+  "keywords": [
+    "ai",
+    "ollama",
+    "chatbot",
+    "history"
+  ],
+  "bugs": {
+    "url": "https://github.com/North-West-Wind/ollama-memory/issues"
+  },
+  "homepage": "https://github.com/North-West-Wind/ollama-memory#readme"
 }
