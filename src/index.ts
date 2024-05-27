@@ -18,6 +18,10 @@ if (!fs.existsSync("history") || !fs.statSync("history").isDirectory()) fs.mkdir
 const app = express();
 app.use(bodyParser.json());
 
+app.get("/", (_req, res) => {
+	res.sendStatus(200);
+})
+
 type Prompt = {
 	name?: string;
 	platform?: string;
