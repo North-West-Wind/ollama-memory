@@ -82,7 +82,7 @@ app.post("/chat/:model", async (req, res) => {
 		}
 	}
 
-	modelHistory[req.params.model].push({ role: "user", content: `Current time: ${moment().format()}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` });
+	modelHistory[req.params.model].push({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` });
 
 	if (body.noResponse) {
 		res.json({ done: true });
