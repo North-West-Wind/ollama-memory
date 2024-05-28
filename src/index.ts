@@ -12,11 +12,9 @@ const OLLAMA = process.env.OLLAMA || "http://127.0.0.1:11434";
 fetch(OLLAMA).then(async res => {
 	if (!res.ok || (await res.text()) != "Ollama is running") {
 		console.error("Invalid Ollama API URL");
-		exit(1);
 	}
 }).catch(err => {
 	console.error(err);
-	exit(1);
 });
 
 if (!fs.existsSync("history") || !fs.statSync("history").isDirectory()) fs.mkdirSync("history");
@@ -26,7 +24,16 @@ app.use(bodyParser.json());
 
 app.get("/", (_req, res) => {
 	res.sendStatus(200);
-})
+});
+
+app.get("/check", (_req, res) => {
+	fetch(OLLAMA).then(async response => {
+		if (!response.ok || (await response.text()) != "Ollama is running") res.sendStatus(500);
+		else res.sendStatus(200);
+	}).catch(err => {
+		res.sendStatus(500);
+	});
+});
 
 type Prompt = {
 	name?: string;
@@ -59,13 +66,6 @@ const modelHistory: { [key: string]: { role: string, content: string }[] } = {};
 app.post("/chat/:model", async (req, res) => {
 	const body = validateRequestBody(req.body);
 	if (!body) return res.json({ error: "Invalid request" });
-	try {
-		const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: req.params.model }) });
-		if (!checkModel.ok) return res.json({ error: "Invalid model " + req.params.model });
-	} catch (err) {
-		console.error(err);
-		return res.json({ error: err });
-	}
 
 	if (!modelHistory[req.params.model]) {
 		if (!fs.existsSync("history/" + req.params.model))
@@ -82,7 +82,16 @@ app.post("/chat/:model", async (req, res) => {
 		}
 	}
 
+	if (modelHistory[req.params.model].length > MAX_HISTORY) modelHistory[req.params.model].splice(0, modelHistory[req.params.model].length - MAX_HISTORY);
 	modelHistory[req.params.model].push({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` });
+
+	try {
+		const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: req.params.model }) });
+		if (!checkModel.ok) return res.json({ error: "Invalid model " + req.params.model });
+	} catch (err) {
+		console.error(err);
+		return res.json({ error: err });
+	}
 
 	if (body.noResponse) {
 		res.json({ done: true });
@@ -99,7 +108,6 @@ app.post("/chat/:model", async (req, res) => {
 			res.json({ error: "Server error " + err });
 		}
 	}
-	if (modelHistory[req.params.model].length > MAX_HISTORY) modelHistory[req.params.model].splice(0, modelHistory[req.params.model].length - MAX_HISTORY);
 });
 
 // save timer
