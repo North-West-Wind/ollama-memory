@@ -68,7 +68,7 @@ app.post("/chat/:model", async (req, res) => {
 	if (!body) return res.json({ error: "Invalid request" });
 
 	if (!modelHistory[req.params.model]) {
-		if (!fs.existsSync("history/" + req.params.model))
+		if (!fs.existsSync("history/" + req.params.model + ".json"))
 			modelHistory[req.params.model] = [];
 		else {
 			try {
