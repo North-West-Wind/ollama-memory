@@ -86,7 +86,7 @@ app.post("/chat/:model", async (req, res) => {
 	}
 
 	if (modelHistory[req.params.model].length > MAX_HISTORY) modelHistory[req.params.model].splice(0, modelHistory[req.params.model].length - MAX_HISTORY);
-	modelHistory[req.params.model].push({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` });
+	modelHistory[req.params.model].push(Object.assign({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` }, body.images ? { images: body.images } : {}));
 
 	try {
 		const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: req.params.model }) });
@@ -100,7 +100,7 @@ app.post("/chat/:model", async (req, res) => {
 		res.json({ done: true });
 	} else {
 		try {
-			const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify(Object.assign({ model: req.params.model, messages: modelHistory[req.params.model], stream: false }, body.images ? { images: body.images } : {})) });
+			const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ model: req.params.model, messages: modelHistory[req.params.model], stream: false }) });
 			if (!chat.ok) res.json({ error: "Ollama error " + chat.status });
 			else {
 				const response = (await chat.json()) as { message: Chat };
