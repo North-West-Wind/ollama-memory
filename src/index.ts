@@ -4,10 +4,10 @@ import express from "express";
 import * as fs from "fs";
 import moment from "moment";
 import fetch from "node-fetch";
-import { exit } from "process";
 
 const MAX_HISTORY = typeof process.env.MAX_HISTORY == "number" ? process.env.MAX_HISTORY : 1000;
 const SAVE_INTERVAL = typeof process.env.SAVE_INTERVAL == "number" ?  process.env.SAVE_INTERVAL : 60000;
+const BANNED_STRINGS = (process.env.BANNED_STRINGS || "").split(",");
 const OLLAMA = process.env.OLLAMA || "http://127.0.0.1:11434";
 fetch(OLLAMA).then(async res => {
 	if (!res.ok || (await res.text()) != "Ollama is running") {
@@ -40,6 +40,7 @@ type Prompt = {
 	platform?: string;
 	message: string;
 	noResponse?: boolean;
+	images?: string[];
 }
 
 type Chat = {
@@ -53,6 +54,7 @@ function validateRequestBody(body: any) {
 	if (typeof body.name === "string") obj = Object.assign(obj, { name: body.name });
 	if (typeof body.platform === "string") obj = Object.assign(obj, { platform: body.platform });
 	if (typeof body.noResponse === "boolean") obj = Object.assign(obj, { noResponse: body.noResponse });
+	if (Array.isArray(body.images) && body.images.every((x: unknown) => typeof x === "string")) obj = Object.assign(obj, { images: body.images });
 	return obj as Prompt;
 }
 
@@ -66,6 +68,7 @@ const modelHistory: { [key: string]: { role: string, content: string }[] } = {};
 app.post("/chat/:model", async (req, res) => {
 	const body = validateRequestBody(req.body);
 	if (!body) return res.json({ error: "Invalid request" });
+	if (BANNED_STRINGS.some(str => body.message.toLowerCase().includes(str))) return res.json({ error: "Message contains banned strings" });
 
 	if (!modelHistory[req.params.model]) {
 		if (!fs.existsSync("history/" + req.params.model + ".json"))
@@ -97,7 +100,7 @@ app.post("/chat/:model", async (req, res) => {
 		res.json({ done: true });
 	} else {
 		try {
-			const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ model: req.params.model, messages: modelHistory[req.params.model], stream: false }) });
+			const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify(Object.assign({ model: req.params.model, messages: modelHistory[req.params.model], stream: false }, body.images ? { images: body.images } : {})) });
 			if (!chat.ok) res.json({ error: "Ollama error " + chat.status });
 			else {
 				const response = (await chat.json()) as { message: Chat };
