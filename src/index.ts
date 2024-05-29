@@ -37,8 +37,8 @@ function validateHistory(json: any) {
 
 // load environment variables
 const MAX_HISTORY = typeof process.env.MAX_HISTORY == "number" ? process.env.MAX_HISTORY : 1000;
-const SAVE_INTERVAL = typeof process.env.SAVE_INTERVAL == "number" ?  process.env.SAVE_INTERVAL : 60000;
-const CACHE_REFRESH = typeof process.env.CACHE_REFRESH == "number" ? process.env.CACHE_REFRESH : 60000;
+const SAVE_INTERVAL = typeof process.env.SAVE_INTERVAL == "number" ?  process.env.SAVE_INTERVAL : 60000; // default: 1 minute
+const CACHE_REFRESH = typeof process.env.CACHE_REFRESH == "number" ? process.env.CACHE_REFRESH : 600000; // default: 10 minutes
 const BANNED_STRINGS = (process.env.BANNED_STRINGS || "").split(",");
 const OLLAMA = process.env.OLLAMA || "http://127.0.0.1:11434";
 
@@ -105,16 +105,21 @@ async function dequeue() {
 	modelHistory[model].push(Object.assign({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` }, body.images ? { images: body.images } : {}));
 
 	let skip = false;
-	try {
-		const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: model }) });
-		if (!checkModel.ok) {
+	if (modelExist[model] === undefined) {
+		try {
+			const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: model }) });
+			if (!checkModel.ok) {
+				skip = true;
+				res.json({ error: "Invalid model " + model });
+			} else modelExist[model] = true;
+		} catch (err) {
 			skip = true;
-			res.json({ error: "Invalid model " + model });
+			console.error(err);
+			res.json({ error: err });
 		}
-	} catch (err) {
+	} else if (!modelExist[model]) {
 		skip = true;
-		console.error(err);
-		res.json({ error: err });
+		res.json({ error: "Invalid model " + model });
 	}
 
 	if (!skip) {
