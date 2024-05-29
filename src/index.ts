@@ -102,28 +102,34 @@ async function dequeue() {
 	if (modelHistory[model].length > MAX_HISTORY) modelHistory[model].splice(0, modelHistory[model].length - MAX_HISTORY);
 	modelHistory[model].push(Object.assign({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` }, body.images ? { images: body.images } : {}));
 
+	let skip = false;
 	try {
 		const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: model }) });
-		if (!checkModel.ok) return res.json({ error: "Invalid model " + model });
+		if (!checkModel.ok) {
+			skip = true;
+			res.json({ error: "Invalid model " + model });
+		}
 	} catch (err) {
-		working = false;
+		skip = true;
 		console.error(err);
-		return res.json({ error: err });
+		res.json({ error: err });
 	}
 
-	if (body.noResponse) {
-		res.json({ done: true });
-	} else {
-		try {
-			const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ model: model, messages: modelHistory[model], stream: false }) });
-			if (!chat.ok) res.json({ error: "Ollama error " + chat.status });
-			else {
-				const response = (await chat.json()) as { message: Chat };
-				res.json(response);
-				modelHistory[model].push(response.message);
+	if (!skip) {
+		if (body.noResponse) {
+			res.json({ done: true });
+		} else {
+			try {
+				const chat = await fetch(OLLAMA + "/api/chat", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ model: model, messages: modelHistory[model], stream: false }) });
+				if (!chat.ok) res.json({ error: "Ollama error " + chat.status });
+				else {
+					const response = (await chat.json()) as { message: Chat };
+					res.json(response);
+					modelHistory[model].push(response.message);
+				}
+			} catch (err) {
+				res.json({ error: "Server error " + err });
 			}
-		} catch (err) {
-			res.json({ error: "Server error " + err });
 		}
 	}
 
