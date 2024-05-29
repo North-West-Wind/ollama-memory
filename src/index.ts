@@ -4,6 +4,7 @@ import express from "express";
 import * as fs from "fs";
 import moment from "moment";
 import fetch from "node-fetch";
+const isEnglish = require("is-english");
 
 // define types
 type Prompt = {
@@ -40,6 +41,7 @@ const MAX_HISTORY = typeof process.env.MAX_HISTORY == "number" ? process.env.MAX
 const SAVE_INTERVAL = typeof process.env.SAVE_INTERVAL == "number" ?  process.env.SAVE_INTERVAL : 60000; // default: 1 minute
 const CACHE_REFRESH = typeof process.env.CACHE_REFRESH == "number" ? process.env.CACHE_REFRESH : 600000; // default: 10 minutes
 const BANNED_STRINGS = (process.env.BANNED_STRINGS || "").split(",");
+const ENGLISH_ONLY = !!process.env.ENGLISH_ONLY;
 const OLLAMA = process.env.OLLAMA || "http://127.0.0.1:11434";
 
 // define other variables
@@ -102,24 +104,46 @@ async function dequeue() {
 	}
 
 	if (modelHistory[model].length > MAX_HISTORY) modelHistory[model].splice(0, modelHistory[model].length - MAX_HISTORY);
-	modelHistory[model].push(Object.assign({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message:\n${body.message}` }, body.images ? { images: body.images } : {}));
 
 	let skip = false;
-	if (modelExist[model] === undefined) {
+	let message = body.message, from = "en";
+	if (ENGLISH_ONLY && !isEnglish(message)) {
 		try {
-			const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: model }) });
-			if (!checkModel.ok) {
+			const translate = await fetch(`https://www.northwestw.in/translate?in=${encodeURIComponent(message)}&deepl=1`);
+			if (!translate.ok) {
 				skip = true;
-				res.json({ error: "Invalid model " + model });
-			} else modelExist[model] = true;
+				res.json({ error: "Translation failed" });
+			} else {
+				const json = await translate.json();
+				message = json.out || message;
+				from = json.lang || from;
+			}
 		} catch (err) {
-			skip = true;
 			console.error(err);
-			res.json({ error: err });
+			skip = true;
+			res.json({ error: "Translation failed" });
 		}
-	} else if (!modelExist[model]) {
-		skip = true;
-		res.json({ error: "Invalid model " + model });
+	}
+
+	modelHistory[model].push(Object.assign({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message${from != "en" ? `(translated from ${from})` : ""}:\n${message}` }, body.images ? { images: body.images } : {}));
+
+	if (!skip) {
+		if (modelExist[model] === undefined) {
+			try {
+				const checkModel = await fetch(OLLAMA + "/api/show", { method: "POST", headers: { 'Content-Type': "application/json" }, body: JSON.stringify({ name: model }) });
+				if (!checkModel.ok) {
+					skip = true;
+					res.json({ error: "Invalid model " + model });
+				} else modelExist[model] = true;
+			} catch (err) {
+				skip = true;
+				console.error(err);
+				res.json({ error: err });
+			}
+		} else if (!modelExist[model]) {
+			skip = true;
+			res.json({ error: "Invalid model " + model });
+		}
 	}
 
 	if (!skip) {

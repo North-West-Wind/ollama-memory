@@ -11,15 +11,19 @@ You can configure the environment variables prior to starting it.
 ```bash
 MAX_HISTORY=1000 # Maximum chat history to keep (includes both user and assistant)
 SAVE_INTERVAL=60000 # Interval between saving in-memory chat history to files
+CACHE_REFRESH=600000 # Interval between refreshing status of Ollama model
 OLLAMA=http://127.0.0.1:11434 # Ollama API root URL
 PORT=3000 # Port to run this program
+BANNED_STRINGS= # Disallowed strings. Case-insensitive, separated by commas
+ENGLISH_ONLY=1 # Translate everything to English before passing to Ollama. Omit to disable
 ```
 
 To communicate with a model, use the `/chat/:model` endpoint (replace `:model` with an existing model).  
 Make a `POST` request with the following body:
 ```json
 {
-	"message": "(required) the prompt",
+	"message": "(required | optional if images exists) the prompt",
+	"images": ["(required | optional if message exists) base64 image"],
 	"name": "(optional) your name",
 	"platform": "(optional) a communication platform, like matrix, discord, twitch",
 	"noResponse": false
