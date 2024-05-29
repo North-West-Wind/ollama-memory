@@ -81,6 +81,7 @@ app.listen(process.env.PORT || 3000, () => console.log("Listening at port " + pr
 
 // dequeue function
 async function dequeue() {
+	console.log("Dequeuing...");
 	working = true;
 	const { model, body, res } = queue.shift()!;
 
@@ -92,6 +93,7 @@ async function dequeue() {
 				const content = fs.readFileSync("history/" + model + ".json", { encoding: "utf8" });
 				const json = JSON.parse(content);
 				modelHistory[model] = validateHistory(json) || [];
+				console.log(`Loaded ${modelHistory[model].length} messages for model ${model}`);
 			} catch (err) {
 				console.error(err);
 				modelHistory[model] = [];
@@ -126,6 +128,7 @@ async function dequeue() {
 					const response = (await chat.json()) as { message: Chat };
 					res.json(response);
 					modelHistory[model].push(response.message);
+					console.log("Prompt processed successfully.");
 				}
 			} catch (err) {
 				res.json({ error: "Server error " + err });
