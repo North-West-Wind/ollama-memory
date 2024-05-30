@@ -129,10 +129,14 @@ async function dequeue() {
 		}
 	}
 
-	modelHistory[model].push(
-		{ role: "system", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}\nPlatform: ${body.platform || "Unknown"}\nFrom: ${body.name || "Unknown"}\n${from != "en" ? `Message translated from ${from}\n` : ""}${body.reply ? `In reply to: ${body.reply}` : ""}` },
-		Object.assign({ role: "user", content: message }, body.images ? { images: body.images } : {})
-	);
+	let content = "";
+	content += `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; `;
+	content += `Platform: ${body.platform || "Unknown"}; `;
+	content += `Message from ${body.name || "Unknown"}; `
+	if (from != "en") content += `Message translated from ${from}; `;
+	if (body.reply) content += `In reply to:\n${body.reply}`;
+	content += `\n\nMessage:\n${message}`;
+	modelHistory[model].push(Object.assign({ role: "user", content }, body.images ? { images: body.images } : {}));
 
 	if (!skip) {
 		if (modelExist[model] === undefined) {
