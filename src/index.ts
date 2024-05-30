@@ -10,24 +10,28 @@ const isEnglish = require("is-english");
 type Prompt = {
 	name?: string;
 	platform?: string;
-	message: string;
 	noResponse?: boolean;
-	images?: string[];
+	reply?: string;
+	message: string;
+	images: string[];
 }
 
 type Chat = {
-	role: "user" | "assistant";
+	role: "user" | "assistant" | "system";
 	content: string;
+	images?: string[];
 }
 
 // function setup
 function validateRequestBody(body: any) {
-	if (typeof body.message !== "string") return null;
-	let obj = { message: body.message };
-	if (typeof body.name === "string") obj = Object.assign(obj, { name: body.name });
-	if (typeof body.platform === "string") obj = Object.assign(obj, { platform: body.platform });
-	if (typeof body.noResponse === "boolean") obj = Object.assign(obj, { noResponse: body.noResponse });
-	if (Array.isArray(body.images) && body.images.every((x: unknown) => typeof x === "string")) obj = Object.assign(obj, { images: body.images });
+	let obj: Partial<Prompt> = {};
+	if (typeof body.name === "string") obj.name = body.name;
+	if (typeof body.platform === "string") obj.platform = body.platform;
+	if (typeof body.noResponse === "boolean") obj.noResponse = body.noResponse;
+	if (typeof body.reply === "string") obj.reply = body.reply;
+	if (typeof body.message === "string") obj.message = body.message;
+	if (Array.isArray(body.images) && body.images.length && body.images.every((x: unknown) => typeof x === "string")) obj.images = body.images;
+	if (!obj.message && !obj.images) return null;
 	return obj as Prompt;
 }
 
@@ -125,7 +129,10 @@ async function dequeue() {
 		}
 	}
 
-	modelHistory[model].push(Object.assign({ role: "user", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}; Platform: ${body.platform || "Unknown"}; Sender: ${body.name || "Unknown"}; Message${from != "en" ? `(translated from ${from})` : ""}:\n${message}` }, body.images ? { images: body.images } : {}));
+	modelHistory[model].push(
+		{ role: "system", content: `Current time: ${moment().format("HH:mm:ss Do MMMM YYYY")}\nPlatform: ${body.platform || "Unknown"}\nFrom: ${body.name || "Unknown"}\n${from != "en" ? `Message translated from ${from}\n` : ""}${body.reply ? `In reply to: ${body.reply}` : ""}` },
+		Object.assign({ role: "user", content: message }, body.images ? { images: body.images } : {})
+	);
 
 	if (!skip) {
 		if (modelExist[model] === undefined) {
